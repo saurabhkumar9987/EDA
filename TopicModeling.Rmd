@@ -1,0 +1,353 @@
+---
+title: "HW 3"
+author: "Saurabh Kumar"
+date: "date"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+set.seed(12345)
+library(magrittr) 
+library(dplyr)
+library(ggplot2) 
+
+## Introduction
+
+You have recently joined the data science team at Target, and your manager has come to you to help her
+solve an important (and high visibility) question to the firm. The Target.com and Advertising & Marketing
+groups have a joint initiative to better target customers with sponsored search advertising (also known as
+“paid search” or just “search advertising”) for products online. The teams cite search advertising as an
+important and effective marketing channel for Target.com (and the entire Target firm more broadly). The
+effectiveness of search advertising is attributed to the fact that search engines match the ads shown to a
+consumer with their current search intent derived from the keyword being used. It subsequently presents an
+appropriate list of ads based on factors such as bids placed by the advertisers (e.g., Target) and their
+historical performance. The ability to present consumers ads tailored to their search context (as indicated
+by the keywords) considerably increases the likelihood that they will click on one these ads. These teams
+at Target want to better understand how various features effect the performance of keyword, and are looking
+to you for guidance. Moreover, they are concerned that they have been following suboptimal bidding
+strategies by bidding too much on keyword terms that do not correspond to customers who are actually
+interested (or can be enticed toward) Target products. They fear that because the context of the consumer's
+search is not directly observable and its prediction can be nontrivial, they bidding strategy used by
+Target.com and the Advertising & Marketing groups could be placing too much value on keywords that are too
+ambiguous. This ambiguity results from the fact that the same keyword might refer to different contexts,
+and competing advertisers might have different intents while bidding on a particular keyword. Therefore,
+you are being asked to conduct an analysis to help provide insight into challenge for the teams.
+
+## Goal 
+
+The goal of this analysis is to explore how various features effect consumer search behavior. Above
+this, you will understand the interplay between a keyword’s context and consumers’ search behavior. More
+specifically, you will need to ascertain how the breadth of a keyword’s context might affect consumer
+behavior and keyword performance. In reality, keyword contextual ambiguity can result in both higher
+diversity in ad quality and higher probability of ad irrelevancy. Therefore, how keyword contextual
+ambiguity would affect consumer click behavior is unclear. To explore this question, you are going to use a
+rich dataset from a major search engine to perform a cross-category analysis and examine which of these two
+opposing effects dominates in the context of search advertising.
+
+## Understanding the data 
+
+The keyword level variables are in `keywords.csv`, with the following data dictionary
+
+| Field | Description |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| num_ads | measures the total number of ads produced for a particular keyword | 
+| num_clicks | measures the total number of clicks a particular keyword receives | 
+| num_impressions | denotes the total number of times consumers search for a particular keyword in the dataset | 
+| num_word | denotes the number of words in the keyword |
+| brand | does the keyword refer to a specific brand |
+| location | does the keyword refer to a specific location |
+| log_trans | a measure of transactional intent, measured by the natural log of the frequency of transactional words that appear in the organic results for this keyword |
+| avg_ad_quality | the average quality of ads shown for this keyword, where the quality of an ad is the average click through rate that the ad receives for other keywords |
+| avg_num_ads | measures the average number of competing advertisers during an impression, which denotes the competitive intensity for a keyword |
+|categoryid | id indicating the keyword's product category |
+
+Additionally, the folder `organic_text` contains a file for each keyword. Each file contains the title and
+textual content of the brief description of the top-50-ranked Google organic search results for the given
+keyword. This text is meant to be a reasonable approximation of text representing the contextual meaning(s)
+of each keyword.
+
+Open the `keywords.csv` data in R 
+
+```{r} 
+folder=""
+keywords <- read.csv("keywords.csv")
+keywords1 <- read.csv("reason_for_leaving_Regis.csv")
+View(keywords)
+
+```
+
+## Exploration 
+
+Using the skills you have amassed over the course, visualize and explore the relationship
+between the variables in your data and/or the keywords. Highlight and describe any interesting
+relationships or patterns you discover in the context of this problem. Feel free to transform or compute
+new variables. One variable you are required to create is click through rate (ctr) which is the proportion
+of ad impressions that result in actual clicks.
+
+```{r}
+#keywords$ctr<- keywords$num_clicks/keywords$num_impressions
+boxplot(keywords)
+
+ggplot(data=keywords, aes(x=num_clicks, y=avg_ad_quality)) +geom_point() +labs(title="Ad Data", x="Num of clicks", y="Avg ad quality")
+ggplot(data=keywords, aes(x=num_impressions, y=ctr)) +geom_point() +labs(title="Ad Data", x="# impres", y="ctr")
+ggplot(data=keywords, aes(x=num_ads, y=num_clicks)) +geom_point() +labs(title="Ad Data", x="# ads", y="# clicks")
+ggplot(keywords, aes(x=num_ads/10000, y=ctr)) + geom_point()
+ggplot(keywords, aes(x=num_word, y=ctr)) + geom_point()
+ggplot(keywords, aes(x=brand, y=ctr)) + geom_point()
+ggplot(keywords, aes(x=location, y=ctr)) + geom_point()
+ggplot(keywords, aes(x=log_trans, y=ctr)) + geom_point()
+
+
+library(reshape2)
+keywords$row <- seq_len(nrow(keywords))
+dat2 <- melt(keywords, id.vars = "row")
+
+
+
+table(keywords$location)
+head(keywords,3)
+str(keywords)
+summary(keywords)
+```
+
+**Replace with explanation of your analysis**
+
+```{r} 
+
+```
+
+**Optional: Replace with explanation of your analysis**
+
+```{r} 
+
+```
+
+**Optional: Replace with explanation of your analysis**
+
+## Modeling 
+The Target teams are concerned with understanding how click-through-rate (ctr) is affected by
+other features in the `keyword.csv` dataset. Regress ctr on `num_ads`, `num_word`, `brand`, `location`,
+`log_trans`, `avg_ad_quality` and/or any other interactions or variables you created from your exploration.
+
+```{r}
+attach(keywords)
+cor(keywords[,3:14])
+fact_location <-factor(location)
+fact_brand <- factor(brand)
+fact_cat_id<-factor(categoryid)
+head(keywords)
+linefit1<-lm(ctr~num_ads+num_word+fact_brand+fact_location+log_trans+avg_ad_quality+fact_cat_id+num_clicks+
+               (num_ads*num_word*fact_brand*fact_location*log_trans*avg_ad_quality))
+
+linefit2<-lm(ctr~num_ads+num_word+fact_brand+fact_location+log_trans+avg_ad_quality+num_clicks+avg_num_ads*avg_ad_quality)
+
+summary(linefit2)
+View(keywords)
+
+```
+
+**Replace with interpretation of the results of your model and explanation of why these variables are
+useful for modeling ctr**
+
+Turn categoryid into factors, if you have not already, and include this variable into your regression
+
+```{r} 
+linefit1<-lm(ctr~num_ads+num_word+brand_fac+loc+log_trans+cat_id+avg_ad_quality+num_impressions+num_clicks+num_ads)
+summary(linefit1)
+```
+
+**Replace with explanation of what adding categoryid to the regression is accomplishing. Also
+interpretation of the results of your model.**
+
+## Topic Modeling 
+One of the major questions of the Target teams is how a keyword’s context (and ambiguity
+thereof) might affect consumer behavior and keyword performance. You will use the recently learned
+algorithm Latent Dirchlet Allocation to discover topics and measure ambiguity.
+
+```{r, include=FALSE}
+# Here are the documentation for packages used in this code:
+#https://cran.r-project.org/web/packages/tm/tm.pdf
+#install.packages("tm")
+library(tm)
+#https://cran.r-project.org/web/packages/topicmodels/topicmodels.pdf
+#install.packages("topicmodels")
+library(topicmodels)
+
+# Use the SnowballC package to do stemming.
+#install.packages("SnowballC")
+library(SnowballC) 
+```
+
+First you must pre-process the text before we run use LDA. 
+```{r} 
+dirname <- file.path(getwd(),"organic_text")
+
+docs <- Corpus(DirSource(dirname, encoding = "UTF-8"))
+#inspect a particular document in corpus
+#writeLines(as.character(docs[[5]]))
+
+# The following steps pre-process the raw text documents. 
+# Remove punctuations and numbers because they are generally uninformative. 
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeNumbers)
+
+# Convert all words to lowercase. 
+docs <- tm_map(docs, content_transformer(tolower))
+
+# Remove stopwords such as "a", "the", etc. 
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+# Use the SnowballC package to do stemming. 
+docs <- tm_map(docs, stemDocument)
+
+# Remove excess white spaces between words. 
+docs <- tm_map(docs, stripWhitespace)
+
+# You can inspect the first document to see what it looks like with 
+#docs[[1]]$content
+
+# Convert all documents to a term frequency matrix. 
+tfm <- DocumentTermMatrix(docs)
+
+
+# We can check the dimension of this matrix by calling dim() 
+print(dim(tfm))
+```
+
+Now that we have finished pre-processing the text, we now can execute LDA to discover topics 
+```{r} 
+# we run LDA with 20 topics, and use Gibbs sampling as our method for identifying the optimal parameters 
+# Note: this make take some time to run (~10 mins)
+results <- LDA(tfm, k = 5, method = "Gibbs")
+results.topics <- as.matrix(topics(results))
+View(results.topics)
+
+# Obtain the top w words (i.e., the w most probable words) for each topic, with the optional requirement that their probability is greater than thresh
+
+#feel free to explore with different values of w and thresh
+w=2 
+thresh = 0.5 
+Terms <- terms(results, w,thresh)
+ldaOut.terms <- as.matrix(terms(results,10))
+View(ldaOut.terms)
+topicProbabilities <- as.data.frame(results@gamma)
+#View(topicProbabilities)
+k<-20
+#write.csv(topicProbabilities,file=paste('LDAGibbs',k,'TopicProbabilities.csv'))
+```
+
+**Replace with a (best guess) label for each topic**
+
+```{r} 
+# Obtain the most likely t topic assignments for each document. 
+t=1 
+Topic <- topics(results,t)
+View(Topic)
+# Get the posterior probability for each document over each topic 
+posterior <- posterior(results)[[2]]
+
+posterior_df <- data.frame(posterior)
+posterior_df$entropy <- apply(posterior_df,1,entropy)
+posterior_df$querycode <- sapply(strsplit(rownames(posterior), "_"), "[", 1)
+
+posterior_df1 <- posterior_df
+posterior_df1 <- subset(posterior_df1,select=c(querycode, entropy))
+posterior_df1 <- merge(keywords, posterior_df1, by = "querycode")
+
+
+# look at the posterior topic distribution for the dth document and plot it visually 
+d = 1 
+posterior[d,]
+barplot(posterior[d,])
+
+# Examine the main topic for document d 
+Terms[[which.max(posterior[1,])]]
+head(keywords$query[d],5)
+
+# Compare the keyword of document d to the terms. keywords$query[d]
+```
+
+**Do the above exploration for 3-5 keywords and describe to what degree the topics that describe the
+keyword are consistent with your knowledge of the keyword.**
+
+## Keyword 
+
+Ambiguity Now that we have run LDA and are able to see the document distributions across topics,
+we want to use this to quantify the ambiguity of each keyword. We are going to use
+[entropy](https://en.wikipedia.org/wiki/Entropy_(information_theory)) to measure the ambiguity of a
+keyword:
+
+\begin{equation*}
+  Entropy(\text{keyword}_i) = - \sum_{t = 1}^{T}{p_{i,t} log(p_{i,t})}
+\end{equation*}
+
+where $p_{i,t}$ is the probability that the organic search text capturing the context of keyword $i$, is
+composed of topic $t$, and $T=20$ in our case of 20 topics. Write a general function to compute entropy,
+given a vector of probabilities. 
+```{r} 
+entropy <- function(probs)
+  {
+  n = length(probs)
+  sum = 0
+  for (i in 1:n){
+    if(probs[i] != 0)
+      sum = sum + probs[i] * log2(probs[i])
+  }
+  #print(sum)
+  return(-sum)
+}
+```
+
+use this `entropy` function to generate a graph of entropy over the interval $[0,1]$.
+
+```{r}
+x <- runif(50, 0, 1)
+n = 50
+x1 <- rep(0,50)
+for(i in 1:n){
+  x1[i] = entropy(c(x[i], 1-x[i]))
+}
+df <- data.frame(x,x1)
+ggplot(aes(x, x1), data=df) + geom_point() + geom_line() +labs(x='Probability', y='Entropy')
+```
+
+**Replace with explaination of what entropy is capturing, and why it would serve as an effective measure of
+ambiguity (the above graph my provid aide)**.
+
+Create a new column in the keyword data that captures the entropy of each keyword 
+```{r}
+#keywords['entropy'] <- apply(posterior, 1, entropy)
+
+View(keywords)
+```
+
+Re-run the regressions from above, adding this new entropy measure as an additional independent variable
+```{r}
+attach(keywords)
+linefit2<-lm(ctr~num_ads+num_word+fact_brand+fact_location+fact_cat_id+log_trans+avg_ad_quality+num_clicks+posterior_df1$entropy+avg_num_ads*avg_ad_quality)
+summary(linefit2)
+```
+
+**Replace with interpretation of the results of your model and explanation of why this new entropy variable
+(in the context of the others) is useful for modeling ctr. Be sure to discuss how ambiguity impacts ctr.**
+
+## Final Analysis and Recommendations
+
+As above, do an exploration and analysis of the specific keyword "target". Also, consider using other
+techniques that you have learned in this course (and other) to gain insights.
+
+```{r}
+head(posterior_df1[posterior_df1$query=='target',]) 
+ggplot(posterior_df1, aes(num_clicks)) + geom_bar()
+
+
+```
+
+**Replace with discussion of both general keyword and "target" specific observations about consumer search
+behavior. A core component of this discussion should be your new measure of ambiguity. Finally, provide
+some suggestions for strategies the Target teams can take to improve their ability to reach customers
+through search advertising. As a simple example, consider keywords related to Target's competitors (e.g.,
+Wal-Mart and KMart) or keyword related to products Target sales. Your suggestions should be supported by
+your analysis or other information you have researched. Therefore, you need to cite your results (or
+research) when making any claims. Also, be sure to state any assumptions necessary for your suggestions to
+be valid.**

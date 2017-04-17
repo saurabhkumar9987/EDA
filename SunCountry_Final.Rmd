@@ -1,0 +1,602 @@
+---
+title: "HW 2"
+author: "your_name"
+date: "date"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(dplyr) #Attaching dplyr library
+library(tidyr) #Attaching tidyr library
+#install.packages("lubridate")
+library(lubridate) #R library to work with date times.
+#install.packages("fastcluster")
+library(fastcluster)
+library(ggplot2)
+```
+
+## Introduction
+
+Sun Country airlines, a unique player in the airline carrier industry has endured the threats of intense
+competition from large national brands. Started in 1983 as a charter carrier, it has expanded its business
+to offer scheduled flight services to various destinations. By 2014, Sun Country had survived
+bankruptcies, multiple economic recessions, threats of mergers and was now stable and profitable.
+
+## Objective
+Sun Country has data representing 1.52 million customers making 1.86 million trips between January
+2013 and December 2014. Your task in regards to this case is to analyze the data for potential
+insight to inform and answer the following questions:
+
+1.  How usable is the data you received from the client (Sun Country)? Given the state of the data,
+    what steps would you take to make it usable and useful -- for the initial assigned project and for
+    Sun Country longer term?
+
+2.  Based on what you see in the data, how many different ways can you view the information to
+    paint a picture of different customer segments? Which ways offer Sun Country the most insights?
+    How could the insights be used?
+
+3.  How would you visualize and present the insights you found for the client? What will you do in
+    order to show Warnken and Vaughan how the insights you derived connect to their business
+    objectives?
+
+4.  Discuss: how much power lies in simply understanding and exploring your data? Consider the
+    downside of focusing too much on fancy models.
+
+## Understanding the data
+The original Sun Country data is in .csv file format. We will use R to preprocess the data and
+analyze it, but first, find below find a data dictionary.
+
+| Field | Description |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PNRLocatorID | PNR #. This could,be treated as a confirmation number. Multiple flights and segments all roll,up to one PNR #. |
+| TicketNum | Ticket Number - An itinerary may have multiple ticket numbers. |
+| CouponSeqNbr | Sabre assigned,sequence number of the ticket coupon. Values are 1-16; values 5 and greater,are a result of a conjunctive ticket. |
+| ServiceStartCity | Airport code for,the city the flight is leaving from. |
+| ServiceEndCity | Airport code for,the city the flight is landing at. |
+| PNRCreateDate | Date the ticket was,booked |
+| ServiceStartDate | When the flight,takes off |
+| PaxName | First 4 digits of,the passenger last name and the first 2 digits of the passenger 1st name |
+| EncryptedName | Passenger name in,encrypted format. |
+| GenderCode | M for Male and F,for Female |
+| Birthdateid | A unique identifier,that allows you to match birthdates across records without actually providing,the birth date. |
+| Age | Age of the,passenger at the time of the flight. |
+| PostalCode | Postal code of the,location from where the booking was made. |
+| BkdClassOfService | What class of,service (e.g. coach, first class, etc.) the passenger booked |
+| TrvldClassOfService | What class of,service (e.g. coach, first class, etc.) the passenger travelled. This could,be upgraded later in the flight. |
+| BookingChannel | How the passenger,booked the flight. If this is showing a 3 letter code, it's most likely booked, at that airport. UFO is booked in Cancun. |
+| BaseFareAmt | Amount of the base,fare (without taxes) of all segments on the ticket. Under certain,circumstances such as bulk, net, award tickets, this value will be blank. |
+| TotalDocAmt | Total price of this,ticket document including base fare, taxes and fees stated in the,EquivBaseFareCurrCode. In the case of exchanges this amount may be zero or,may only represent the difference in price from the previous ticket amount |
+| UflyRewardsNumber | The rewards number,that was provided when booked. |
+| UflyMemberStatus | The Ufly member,status. It will be either Standard or Elite. |
+| CardHolder | True or False value,if the member is also a credit card holder. |
+| BookedProduct | Free form text,field that is used to put discount codes in |
+| EnrollDate | When the member,enrolled in Ufly rewards |
+| MarketingFlightNbr | Flight Number |
+| MarketingAirlineCode | The Airlines with,which booking was made. We are only interested in ‚ "SY" which is,the code for Sun Country |
+| StopoverCode | O' for Layovers ie,halt in a city for less than 24 hours.'X' for Stopovers that is halt in a,city for more than 24 hours. |
+
+Open the `.csv` data R
+```{r}
+#folder=""
+#setwd(folder)
+
+# It may take a few minutes (2-5) to load the data, therefore considering suggestion below
+data<-read.csv("SunCountry.csv") #Data is stored in the dataframe called “data”
+
+# Suggestion: Load data directly into your workspace (i.e., running the read.csv command in your console). When you want to make sure that your markdown is correctly written and the html output is apprpriate, which you should do frequently, use a smaller sample of the data. Then subsample the data with the command below. Otherwise, each time you knit your file, you will have to wait for all the data to laod. Once you are happy with your markdown file, before your submit, be sure to change the data source back to the original data. Also, all your analysis/answers should be completed with the original data, but you can use your console to accomplis this.
+
+data_orig <- data
+sample_rows <- sample.int(nrow(data),100000)
+data <- data[sample_rows,]
+#write.csv(data,"data_small.csv")
+```
+
+Now look at the structure of the data
+```{r}
+str(data)
+```
+
+and summarize it
+```{r}
+summary(data)
+```
+
+## Data Preperation
+
+### Data Cleaning
+
+The following are the attributes that need treatment.
+
+| GenderCode and Birthdateid | Remove rows with faulty Gendercode and BirthdateID |
+|----------------------------|----------------------------------------------------|
+| Age                        | Replace faulty values with median value            |
+| UflyRewardsNumber          | Replace NAs with 0                                 |
+| UflyMemberStatus           | Replace Missing values with "non-member"           |
+| Duplicate PNRs             | Remove rows with duplicate PNRs                    |
+| BookingChannel             | Remove rows with city codes as BookingChannel      |
+| Marketing Airline Code     | Remove rows with airline code other than "SY"      |
+| Error PNRs                 | Remove error PNRs                                  |
+
+
+We need to remove rows with faulty Gendercode and BirthdateID
+```{r}
+#Filtering out records which have NA for BirthdateID
+#same as data <- data %>%filter(!is.na(birthdateid)) 
+data%<>%filter(!is.na(birthdateid)) 
+
+data$GenderCode<-as.character(data$GenderCode)
+data%<>%filter(GenderCode!="")
+
+#Filtering out records which have “” for GenderCode
+data$GenderCode<-as.factor(data$GenderCode)
+```
+
+Replace faulty values in Age with median value
+```{r}
+#Replacing negative ages with median value
+data$Age[data$Age < 0] <- median(data$Age)
+
+#Replacing age values greater than 120 with median value
+data$Age[data$Age > 120] <- median(data$Age)
+```
+
+Replace NAs in UflyRewardsNumber with 0
+```{r}
+#Replace NAs with 0
+data$UFlyRewardsNumber[is.na(data$UFlyRewardsNumber)] <- 0
+```
+
+Replace Missing values in UflyMemberStatus with “non-member”
+```{r}
+#Convert factor level data to string
+data$UflyMemberStatus<-as.character(data$UflyMemberStatus)
+
+#Replace missing values with “non-ufly” 
+data$UflyMemberStatus[data$UflyMemberStatus==''] <-"non-ufly"
+```
+
+Retaining only those rows which have single occurrence of PNRLocatorID, CouponSeqNbr, PaxName, ServiceStartCity, ServiceEndCity, ServiceStartDate combination.
+```{r}
+data%<>%
+  group_by(PNRLocatorID,CouponSeqNbr,PaxName,ServiceStartCity,ServiceEndCity,ServiceStartDate)%>%
+  filter(n()==1)
+```
+
+Remove rows with faulty city codes as BookingChannel. Some rows have city names for Booking Channel.
+Replacing faulty data with “Other”
+```{r}
+data$BookingChannel<-as.character(data$BookingChannel)
+data$BookingChannel[data$BookingChannel!="Outside Booking" & 
+                      data$BookingChannel!="SCA Website Booking" & 
+                      data$BookingChannel!="Tour Operator Portal" & 
+                      data$BookingChannel!="Reservations Booking" & 
+                      data$BookingChannel!="SY Vacation"] <- "Other"
+data$BookingChannel<-as.factor(data$BookingChannel)
+```
+
+Remove rows with MarketingAirlineCode code other than “SY”, the airline code for Sun Country.
+```{r}
+data$MarketingAirlineCode<-as.character(data$MarketingAirlineCode)
+data%<>%filter(MarketingAirlineCode=="SY")
+data$MarketingAirlineCode<-as.factor(data$MarketingAirlineCode)
+```
+
+Creating a new column called error which contains 1 if the PNR is errored or 0 otehrwise.
+Error PNR refers to those which do not start with coupon sequence number 1.
+```{r}
+data%<>%group_by(PNRLocatorID)%>%
+  mutate(error= ifelse(min(CouponSeqNbr)!=1,1,0))
+```
+
+Retaining only the non errored rows and check how many rows are remaining.
+```{r}
+data%<>%filter(error==0)
+nrow(data)
+```
+
+### Data Sampling
+Since the data, after transformation, has 3.2 million rows, we take a sample of the data to perform further analysis to facilitate R to handle the data with ease. Since the data is at the level of one row per flight, just taking a random sample of the rows will distort the trip details. So, we take a sample of the PNRLocatorIDs and retain all the records belonging to the sampled PNRs.
+```{r}
+#Obtain Unique PNRs
+uniquePNRs<-unique(data$PNRLocatorID) 
+
+#To produce the same samples every time the code is run
+set.seed(1234567)
+
+
+sample_PNRs<-sample(uniquePNRs,10000)
+
+#Obtaining data related to the sampled 10,000 PNRs
+sample_data<-data%>%filter(PNRLocatorID %in% sample_PNRs)
+```
+
+
+### Data Transformation
+For the purpose of analysis, attributes are created as a combination of other attributes.
+
+| 1 | UID | Unique ID for every customer |
+|----|------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| 2 | Age Bucket | Bin customer age into 5 age buckets |
+| 3 | True Origin | The starting city of every trip |
+| 4 | Final destination | The ending city of the trip |
+| 5 | True Destination | The actual destination of the trip (City of longest stay) |
+| 6 | Oneway-RoundTrip | 1 if the trip was a round trip and 0 if one way |
+| 7 | Group Size | Size of the group if the trip constituted of more than one passengers. |
+| 8 | Group-Single | 1 if the trip was flown by more than 1 customers and 0 if the trip was flown by a single customer. |
+| 9 | Seasonality | Q1 if travel was made in Jan-Mar Q2 if travel was made in Apr-June Q2 if travel was made in July-Sept Q2 if travel was made in Oct-Dec |
+| 10 | Days Booked in Advance | Number of days between booking and travel |
+
+First, create a Unique ID for each customer by concatenating Encrypted name, GenderCode and birthdateid.
+```{r}
+sample_data<-sample_data%>% mutate(uid=paste(EncryptedName,GenderCode,birthdateid,sep=""))
+```
+
+Next, we bin the customers' age into 1 of 5 age buckets
+```{r}
+sample_data%<>%mutate(age_group = 
+                        ifelse(Age>=0 & Age<18,"0-17",
+                               ifelse(Age>=18 & Age < 25,"18-24",
+                                      ifelse(Age>=25&Age<35,"25-34",
+                                             ifelse(Age>=35 & Age<55,"35-54",
+                                                    ifelse(Age>=55,"55+",0)
+                                                    )
+                                             )
+                                      )
+                               )
+                    )
+```
+
+Next, we determining the true Service Start City for each row in the data. It will be the First city from which the trip started 
+```{r}
+true_origins<-sample_data%>%
+  arrange(PNRLocatorID,CouponSeqNbr)%>%
+  group_by(PNRLocatorID,PaxName)%>%
+  do(data.frame(true_origin=first(.$ServiceStartCity)))
+
+sample_data<-merge(sample_data,true_origins,
+                   by.x=c("PNRLocatorID","PaxName"),
+                   by.y = c("PNRLocatorID","PaxName"))
+```
+
+Next, we determine where the trip ended. If the trip is a round trip, the service end city (Final Destination) will be the same as the service start city (True Origin)
+```{r}
+final_destination<-sample_data%>%
+  arrange(PNRLocatorID,CouponSeqNbr)%>%
+  group_by(PNRLocatorID,PaxName)%>% 
+  do(data.frame(final_destination=last(.$ServiceEndCity)))
+
+sample_data<-merge(sample_data,final_destination,
+                   by.x=c("PNRLocatorID","PaxName"),
+                   by.y = c("PNRLocatorID","PaxName"))
+```
+
+Next, we determine what was the trips true destination. We assume this was the place where most time was spent on the trip.
+```{r}
+#Convert Service Start date to Date type
+sample_data$ServiceStartDate<-as.Date(sample_data$ServiceStartDate)
+
+#The place of maximum stay during the trip.
+diff1<-sample_data%>%
+  arrange(PNRLocatorID,CouponSeqNbr)%>%
+  group_by(PNRLocatorID,PaxName)%>%
+  mutate(stay=lead(ServiceStartDate)-ServiceStartDate,default=0)%>%
+  select(PNRLocatorID,PaxName,ServiceStartCity,ServiceEndCity,ServiceStartDate,stay)
+
+diff1$stay[is.na(diff1$stay)]<-0
+diff1$stay<-as.numeric(diff1$stay)
+
+true_destination<-diff1%>%
+  group_by(PNRLocatorID,PaxName)%>%
+  do(data.frame(true_destination= first(as.character(.$ServiceEndCity)[.$stay==max(.$stay)])))
+
+sample_data<-merge(sample_data,true_destination,
+                   by.x=c("PNRLocatorID","PaxName"),
+                   by.y = c("PNRLocatorID","PaxName"))
+```
+
+Next, we determine if the trip was a one-way or round-trip. The trip is considered a round trip if the service end city (Final Destination) will be the same as the service start city (True Origin).
+```{r}
+sample_data%<>%
+  mutate(round_trip = ifelse(as.character(true_origin)==as.character(final_destination), 1, 0))
+```
+
+Next, we determine the group size, the number of people who traveled together in each trip.
+```{r}
+sample_data%<>%
+  group_by(PNRLocatorID)%>%
+  mutate(group_size= length(unique(uid)))
+```
+
+Next, we have a special inidcator if the group-size was 1,i.e., flown by a single customer
+```{r}
+sample_data%<>%
+  group_by(PNRLocatorID)%>%
+  mutate(group= ifelse(group_size>1,1,0))
+```
+
+Next, handle seasonality in terms of quaters. Assign Q1 to Q4 based on the quarter of the year
+in which the trip was made
+```{r}
+sample_data$ServiceStartDate<-as.Date(sample_data$ServiceStartDate)
+#Convert ServiceStartDate from factor to Date format
+sample_data%<>%
+  group_by(PNRLocatorID,PaxName)%>%
+  mutate(seasonality= ifelse(month(ServiceStartDate)>=1 & month(ServiceStartDate)<=3,"Q1",
+                             ifelse(month(ServiceStartDate)>=4 & month(ServiceStartDate)<=6,"Q2",
+                                    ifelse(month(ServiceStartDate)>=7 & month(ServiceStartDate)<=9,"Q3",
+                                           ifelse(month(ServiceStartDate)>=10 & month(ServiceStartDate)<=12,"Q4",0)
+                                           )
+                                    )
+                             )
+         )
+```
+
+Finally, we calculate the number of days the ticket was booked in advance. It is the difference between PNRCreateDate and ServiceStartDate
+```{r}
+sample_data$PNRCreateDate <- as.Date(sample_data$PNRCreateDate) 
+sample_data$ServiceStartDate <- as.Date(sample_data$ServiceStartDate)
+sample_data%<>% 
+  mutate(days_pre_booked=as.numeric(floor( difftime(ServiceStartDate,
+                                                    PNRCreateDate,units=c("days")))))
+```
+
+## Customer Segmentation
+We want to use the data to segment customers of Sun Country Airlines into general categories of people with similar 
+flying patterns. The goal is to group the observations in the data into clusters such that every datum in a cluster is
+more similar to other datums in the same cluster than it is to datums in other clusters.
+
+### Change data granularity
+In order to run the segmentation algorithm, we need to first have the data at the right granularity. Since we are
+looking to segment customers, it is important to bring the data to the granularity of customers. We transform the data
+such that each row represents a unique customer-PNR combination.
+```{r}
+sample_data%<>%
+  select(PNRLocatorID, uid, PaxName, ServiceStartDate, BookingChannel, TotalDocAmt,
+         UFlyRewardsNumber,UflyMemberStatus, age_group,true_origin,true_destination,
+         round_trip,group_size,group, seasonality,days_pre_booked)
+
+#This may take a considerable amount of time
+customer_data <- sample_data %>%
+  group_by(PNRLocatorID,uid,PaxName) %>%
+  summarise(ServiceStartDate=first(ServiceStartDate),
+            BookingChannel=first(BookingChannel), 
+            avg_amt=max(TotalDocAmt),
+            UFlyRewards=first(UFlyRewardsNumber),
+            UflyMemberStatus=first(UflyMemberStatus),
+            age_group=last(age_group),
+            true_origin=first(true_origin),
+            true_destination=first(true_destination),
+            round_trip=first(round_trip),
+            group_size=first(group_size),
+            group=first(group), 
+            seasonality=last(seasonality), 
+            days_pre_booked=max(days_pre_booked))
+
+#Retaining only those attributes that are meaningful for clustering
+customer_data<- subset(customer_data,select=c(BookingChannel,avg_amt,UflyMemberStatus,age_group,true_origin,true_destination,round_trip,group_size,group,seasonality,days_pre_booked))
+customer_data%<>%
+  select(-PNRLocatorID,-PaxName,-ServiceStartDate,-UFlyRewards)
+  nrow(sample_data)
+
+  #Granularity of data was reduced to customer level
+  nrow(customer_data)
+```
+
+### Units and Scaling
+The initial understanding of the data has shown us that this contains attributes of different units. Units affect what
+clustering algorithms will discover. One way to try to make the clustering more coordinate- free is to transform all 
+the columns to have a value between 0 and 1. This is called Normalization. There are multiple techniques of achieving 
+normalization. We will be using the min-max normalization technique.
+```{r}
+#Min-Max normalization: x= x-max/max-min
+normalize <- function(x){return ((x - min(x))/(max(x) - min(x)))}
+
+customer_data_km = mutate(customer_data,
+                     avg_amt = normalize(avg_amt),
+                     days_pre_booked = normalize(days_pre_booked),
+                     group_size=normalize(group_size))
+```
+
+### Clustering algorithm
+Various clustering algorithms can be used to achieve the goal of segmentation. Let us discuss...(add your comments here)
+
+### Visualizing the Clusters
+Now that the data is divided into clusters, we can interpret the clusters by summarizing the data within each cluster. The most intuitive way of interpreting clusters is using visualizations. Consider visualizing differences between the cluster in Ufly membership, one way vs round trips, group size, seasonality, booking channel, amount spent, days pre booked. You should considere other differences, as substiutes or in addition to these suggestions. Note you will not recieve full credit if you only do the suggested diffrences.
+
+```{r}
+customer_data_km.features=customer_data_km
+View(customer_data_km.features)
+data<-customer_data_km[,c(2,4,7)]
+library(fpc)
+library(dbscan)
+View(customer_data_km)
+data<-customer_data_km[,c("avg_amt","days_pre_booked")]
+head(data)
+
+library(cluster)
+library(stats)
+############# 
+daisy.mat <- as.matrix(daisy(customer_data_km, metric="gower"))
+################
+diss<-daisy(data,metric="gower",stand=FALSE)
+
+## distance matrix using Gower distance 
+sample_rows <- sample.int(nrow(customer_data_km),5000)
+customer_data_km <- customer_data_km[sample_rows,]
+customer_data_km$UflyMemberStatus <- as.factor(customer_data_km$UflyMemberStatus)
+customer_data_km$age_group <- as.factor(customer_data_km$age_group)
+customer_data_km$true_destination <- as.factor(customer_data_km$true_destination)
+customer_data_km$seasonality <- as.factor(customer_data_km$seasonality)
+
+
+distance<-daisy(customer_data_km,metric="gower",stand=FALSE)
+daisy(data, metric = c("gower"),
+      stand = FALSE, type = list())
+## hiearchial clustering 
+x <- as.matrix(customer_data_km[,1:4])
+hcluster <- hclust(diss, method = "ward.D")
+plot(hcluster, hang = 0, label = F, main = "Cluster Dendrogram")
+
+## k-means clustering 
+kcluster <- kmeans(data, 3)
+kcluster$size
+kcluster$centers
+kcluster$cluster
+plotcluster(data, kcluster$cluster)
+## More complex
+clusplot(data, kcluster$cluster, color=TRUE, shade=TRUE, 
+         labels=3, lines=0)
+plot(data, col = (kcluster$cluster), main = "K means clustering",
+     pch = 20, cex = 2)
+
+## DBSCAN clustering 
+db <- dbscan(customer_data_km, eps = 0.15, MinPts = 5)
+# Plot DBSCAN results
+plot(db, data, main = "DBSCAN", frame = FALSE)
+#install.packages('clusterR')
+
+library(clusterR)
+## 15181 records in teh dataset
+final_data<-read.csv("final_data.csv")
+View(final_data)
+sample_rows <- sample.int(nrow(customer_data_km),5000)
+final_data <- final_data[sample_rows,]
+final_data$UflyMemberStatus <- as.factor(final_data$UflyMemberStatus)
+final_data$age_group <- as.factor(final_data$age_group)
+final_data$true_destination <- as.factor(final_data$true_destination)
+final_data$seasonality <- as.factor(final_data$seasonality)
+
+distance <- as.matrix(daisy(final_data, metric="gower"))
+
+gower_distance<-daisy(final_data,metric="gower",stand=FALSE,type=list())
+
+kmeans_data<-final_data[,c("avg_amt","group_size","days_pre_booked")]
+
+############# Hiearchial Clustering ######################
+View(final_data)
+
+### SSE curve 
+SSE_curve <- c()
+for (n in 1:10) {
+  kcluster <- kmeans(kmeans_data, n)
+  print(kcluster$withinss)
+  sse <- sum(kcluster$withinss)
+  SSE_curve[n] <- sse
+}
+plot(1:10, SSE_curve, type="b", xlab="Number of Clusters", ylab="SSE")
+
+kcluster <- kmeans(kmeans_data,10)
+kcluster$size
+kcluster$centers
+kcluster$cluster
+plot(kmeans_data, col = (kcluster$cluster), main = "K means clustering",
+     pch = 20, cex = 2)
+
+plotcluster(kmeans_data, kcluster$cluster)
+clusplot(kmeans_data, kcluster$cluster, color=TRUE, shade=TRUE, 
+         labels=3, lines=0)
+
+##########################################################################
+############### Heiarchial Clustering by Dendograms ######################
+##########################################################################
+hcluster <- hclust(gower_distance, method = "ward.D")
+plot(hcluster, hang = 0, label = F, main = "Cluster Dendrogram")
+
+##################################################################
+############  Density based clustering by DBSCAN #################
+##################################################################
+ds<-dbscan(kmeans_data,0.1,5)
+plot(kmeans_data[ds$cluster %in% 1:10,])
+smoothScatter(kmeans_data)
+
+########  distance matrix for Gower distance
+distance_final <- as.matrix(daisy(kmeans_data, metric="gower"))
+
+####################################################################################################
+################## k-mediod clustering through Partitioning Around Medoids(PAM) ####################
+####################################################################################################
+#install.packages("factoextra")
+library(factoextra)
+library(ggplot2)
+kmediods <- pam(x = gower_distance, k = 2, diss = TRUE)
+kmediods$mediods
+head(kmediods$cluster)
+#clusplot(kmediods, main = "Cluster plot, k = 7", color = TRUE)
+fviz_cluster(kmediods,stand=FALSE,geom = "point",pointsize=1)
+fviz_silhouette(silhouette(kmediods))
+
+
+#############   PAM clustering ###################
+sil_width <- c(NA)
+
+for(i in 2:10){
+  
+  pam_fit <- pam(gower_distance,
+                 diss = TRUE,
+                 k = i)
+  
+  sil_width[i] <- pam_fit$silinfo$avg.width
+  
+}
+plot(1:10, sil_width,
+     xlab = "Number of clusters",
+     ylab = "Silhouette Width")
+
+library(Rtsne)
+lines(1:10, sil_width)
+tsne_obj <- Rtsne(gower_distance, is_distance = TRUE)
+
+```
+
+We could also usign predictive models--e.g., regression (`lm` package) or decision trees (`rpart` package)--inside of each cluster to better understand and explore there differences. You wil recieve extra credit if you conduct clear and coherent analysis (with exposition on the results) using predictive modeling in addition to the visualizations above.
+```{r}
+
+```
+
+## Objective Revisisted
+Recall that your task is to analyze the data for potential insight to inform and answer the following questions. You should have been computing results, accompanied by exposistion, in support of answers these questions throughout. However, spend the rest of this document bringing everything you learned together to explicitly address these questions. You should also ensure that you actually discuss and characterize the various segments that you discovered.
+
+1.  How usable is the data you received from the client (Sun Country)? Given the state of the data,
+    what steps would you take to make it usable and useful -- for the initial assigned project and for
+    Sun Country longer term?
+    
+    Seeing the size of the data, there are a number of steps that should be followed in order to make it usable: 
+    * Data Cleaning: The following rows are treated for erroneous values and NAs. 
+      |    Age                     | Replace faulty values with median value            |
+      | UflyRewardsNumber          | Replace NAs with 0                                 |
+      | UflyMemberStatus           | Replace Missing values with "non-member"           |
+      | Duplicate PNRs             | Remove rows with duplicate PNRs                    |
+      | BookingChannel             | Remove rows with city codes as BookingChannel      |
+      | Marketing Airline Code     | Remove rows with airline code other than "SY"      |
+      | Error PNRs                 | Remove error PNRs                                  |
+    
+    * Data Sampling: The records with unique PNRs are sampled from the dataset of 100000 records.
+    
+    * Data Transformation: 
+      > The Age column is created into categorical variable by creating bins: 
+      a) 0-17: Teenager
+      b) 18-24: Later Adolescents
+      c) 25-34: Early Adulthood
+      d) 35-54: Middle Aged
+      e) 55+: Old age
+      > Determine  
+
+2.  Based on what you see in the data, how many different ways can you view the information to
+    paint a picture of different customer segments? Which ways offer Sun Country the most insights?
+    How could the insights be used?
+    
+    ****
+
+3.  How would you visualize and present the insights you found for the client? What will you do in
+    order to show Warnken and Vaughan how the insights you derived connect to their business
+    objectives?
+    
+    **Answer**
+
+4.  Discuss: how much power lies in simply understanding and exploring your data? Consider the
+    downside of focusing too much on fancy models.
+    
+    **Answer**
+    

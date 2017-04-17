@@ -1,0 +1,132 @@
+---
+output: pdf_document
+---
+# Assignment 2 - Answer questions 1 - 8 in the space below. 
+
+For this assignment include all your R code in this R Markdown file to support your answer. Your code goes in the code "chunks" below. If you open this file in RStudio then you can run all the R code by clicking on the `Knit HTML` button. You can experiment with code in the R console and then paste your code into this document, or write it directly in this document and send it over to the console with the keyboard shortcut `command+enter` or `control+enter`.
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+summary(cars)
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+##Questions 1 to 4 are for a company called Restaurant Grades
+Restaurant Grades (RG) is a hypothetical restuarant review company such as Yelp. Like Google it has organic and paid search results, and it makes money by selling advertisment slots. Becuase good restaurants will show up high on organic results there are doubts about whether it pays off, for a restaurant, to advertise on RG. To do this, RG has run an experiment with two treatment arms, corresponding to two types of advertising and targeting packages for restaurant owners, and a control group that has no advertising. In the data this is coded as the 'treatment' variable having values {0 for control, 1 for the first type of treament arm, 2 for the second type of treatment arm}
+
+1. Load the dataset `resturantGrades.csv` from moodle into a dataframe called `restGrade` (you may need to convert the XLSX file to CSV). Don't display the code to load the file in the knitted document. Provide summary statistics of the dataset and comment on anything of interest.
+
+library('readxl')
+getwd()
+restGrade<-read_excel("restaurantGrades.xlsx", na="NA", col_names = TRUE)
+summary(restGrade)
+# Observations #
+# Mean and Median of calls and reservations are almost same.THe mean of pageviews is higher than the median. So, pageviews is right-skewed. The range of pageviews is from 145 to 929 over a sample size of 30000. SImilarly the range of reservations is 15-79 and calls is 17-77. The overal sample size si denoted by business_id which is 30000. The treatment variable is a nominal variable with 0,1,2 values for control and treatment groups. 
+
+
+2. Given that there is a set of restuarants that have already bought ads, do you need to run an experiment? Or can you simply compare outcomes of restuarants that do and do not advertise on outcomes that the restaurants care about to determine whether advertising is effective?
+
+# Yes we need to run an experiment to measure whether advertisement is effective or not.Also, which of the 2 ads is better also needs to be determined along with whether or not the ad display needs to be changed. By just looking at the data, we can observe that the mean number of reservations by treatent group 0 who has not seen the ads is less than group 1 and 2 who have seen them.It can be inferred that the ads do an effect on reservations. 
+
+#Simply measuring the outcome which the restaturant care about, which is reservation in this case,cannot determine wheter advertising is effective. This is because a high pageviews,for example, does not necessarily ensure higher reservations. There are many hidden factors which affect reservations.
+
+3. Which outcome variable is most useful to consider? Are there other outcome variables that may be useful to measure?
+
+# Pageviews is the most useful outcome variable to consider as it can measure the effect on advertising. Other variables that might be useful to measure are reservations. It is difficult to gauge the factors that affect reservations. It is better to look at the pageviews as an increase in pageviews can be directly attributed to ads.Therefore, pageviews as the response variable should be considered.
+
+
+4. Can you convince sceptical restuaranters that advertising works? Should RG stick to current ad design, or switch to the alternative? Use all the analytics you know to answer this question in a data-driven manner. 
+
+# Yes, we can convince sceptical restauranters that advertising works.The box plots generated from the below code clearly show that the mean reservations of Treatment group 1 and 2 which have been shown the advertisement are higher than the treatment group 1 which has not been shown the advertisement. Also, ad type 1 works better than ad type 2. 
+
+#Analysis of Variance:*
+*By doing the analysis of variance test on treatment with pageviews, the p-value obtained is low. There is a relationship between treatment and the pageviews.The probability of getting a sample with the estimates as extreme as this or more, if there is no relationship betweeen treatment and the pageviews, is too low.*
+
+# Multiple Regression:
+# Using treatment and the restaurant_type as predictors and pageviews as response,after running the regression model, the multiple R-square obtained is 89.39%. This explains that the 89.39% of the variation is explained by the variation in treatment. Hence, RG can convince the restaurants that ad wroks.
+
+# Also from the mean pageviews of different treatments, the mean incresed for both ads. Hence, the pageviews increased because of the ads.The current ad is working.Hence there is no need to the current ad design.
+
+```{r}
+attach(restGrade)
+tapply(pageviews,treatment,mean)
+boxplot(pageviews~treatment)
+linefit1<-lm(pageviews~treatment+restaurant_type)
+summary(linefit1)
+cor(restGrade[,1:4])
+```
+
+##Questions 5 to 8 relate to the Global Mobile Apps dataset
+5. Load the dataset `GlobalMobileAppsExercise.csv` from moodle into a dataframe called `gmapps` . Don't display the code to load the file in the knitted document. Provide summary statistics of the dataset and comment on anything of interest.
+
+
+```{r}
+gmapp<-read.csv("GlobalMobileAppsExercise.csv")
+summary(gmapp)
+```
+#The distribution of the filesize of the apps is right skewed as the mean is higher than the median.More than 80% of the data are from appstore*
+
+
+6. Develop a regression model that links the rank of an app on the platform (this is a proxy for sales) to various factors that you think are important. Interpret your key results into insights. 
+
+```{r}
+attach(gmapps)
+linefit<-lm(rank~price+in_app_purchase+rindex+rating_count+filesize+app_type+app_age_current_version+num_screenshot)
+summary(linefit)
+
+```
+#The regression model is fit with Rank as outcome variable and all the other columns as predictor variables. The multiple R-square obtained is 5.7% percent which is very low.This indicates that the explained variation by the model is less. 20 predictors were included in the model.The effect of decreasing the number of predictors has an effect as shown below. 
+
+# The multiple R-square obtained is 4.6%, which is the explained variation in rank because of the variation in predictors. The estimate of num_screenshot is 2.09, which means that if number of screenshots increases by 1, the rank of the app increases by 2, holding the other predictors fixed. The residual standard error is high. Also the p-values are low for each of the predictor variables, which imply a relationship with each predictor variable to teh rank.
+
+
+7. Is the price sensitivity of consumers in differnt regions of the world similar or different?
+
+```{r}
+fit1<-aov(price~rindex)
+summary(fit1)
+
+```
+#Running the analysis of variance test between price of the apps and the rindex,the p-value obtained is low, which tells us that there is a relationship between the price of the apps getting downloaded and the region. Hence it is safe to conclude that the price sensitivity differs in different regions of the world.
+
+8. Can you refine 6. above to account for unobserved time invariant factors that may bias the results of 6. Note, the traditional (efficient) way of running fixed effects models using procedure 'plm' may not work here as data does not have a column for the appIndex or even the appName (unique). What we can do instead is to try to use the concept of adding fixed effects using dummy variables for the key attributes that we might think could be causing omitted variable bias. Using plm to estimate fixed effects is a smarter way to do it -  if you have a clean panel structure in your data. However, adding categorical dummy variables say for the category of the app or the developer of the app is akin to estimating a ordinary least squares model with category fixed effects. 
+
+In R the idea is to estimate something like y~x+factor(category). This will create N-1 dummy variables for N categories and estimate their 'fixed effect!' Its a nice feature. The downside is if you had a 1000 categories you would adding 999 dummy variables to your estimation. PLM does this more efficiently, but sometimes that data is not amenable to that. 
+
+The idea behind adding adding category fixed effects to an OLS estimator is that if there was something unoverved to us about a category that was impacting their pricing strategy and also its sales rank, we would have accounted for it. 
+
+
+```{r}
+gmapp['dev_index']=as.numeric(factor(developer))
+attach(gmapp)
+linefit<-lm(rank~price+in_app_purchase+rindex+rating_count+filesize+app_type+app_age_current_version+num_screenshot+dev_index)
+summary(linefit)
+```
+
+
+
+##BONUS 1: Is there another variable akin to category that you might want to add a fixed effect for? If so, try it and report what happens. 
+
+##Bonus extra credit question (worth 2 percentage points over and above Assignmment 2 which is from Questions 1-8)
+
+Refer to Pages 61 - 64 of Introductory Statistics with Randomization and Simulation (1st Edition) by David M. Diez, Christopher D. Barr, and Cetinkaya-Rundel ?? (hereafter DBCR-Book)- visit https://www.openintro.org/stat/textbook.php?stat_book=isrs 
+
+In a group of 24 men and 24 women, 35 individuals, 21 of which were men, were promoted. The key question is whether there is gender discrimination? The authors suggest testing this using a simulation, the output of which is reflected in Figure 2.3 on Page 64. 
+
+Generate this simualtion (the logic is in the text) and see whether the observed 29% difference between the promotion rates of men and women is likely to be observed if there was no discrimination.
+
+
+```{r}
+
+```
+
